@@ -1194,6 +1194,54 @@ impl Bucket {
         request.response_data(false).await
     }
 
+    /// Gets specified inclusive byte range of file from an S3 path as stream.
+    ///
+    /// # Example:
+    ///
+    /// ```rust,no_run
+    /// use s3::bucket::Bucket;
+    /// use s3::creds::Credentials;
+    /// use anyhow::Result;
+    ///
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    ///
+    /// let bucket_name = "rust-s3-test";
+    /// let region = "us-east-1".parse()?;
+    /// let credentials = Credentials::default()?;
+    /// let bucket = Bucket::new(bucket_name, region, credentials)?;
+    ///
+    /// // Async variant with `tokio` or `async-std` features
+    /// let response_data = bucket.get_object_range("/test.file", 0, Some(31)).await?;
+    ///
+    /// // `sync` feature will produce an identical method
+    /// #[cfg(feature = "sync")]
+    /// let response_data = bucket.get_object_range("/test.file", 0, Some(31))?;
+    ///
+    /// // Blocking variant, generated with `blocking` feature in combination
+    /// // with `tokio` or `async-std` features.
+    /// #[cfg(feature = "blocking")]
+    /// let response_data = bucket.get_object_range_blocking("/test.file", 0, Some(31))?;
+    /// #
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[maybe_async::maybe_async]
+    pub async fn get_object_range_stream<S: AsRef<str>>(
+        &self,
+        path: S,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<ResponseDataStream, S3Error> {
+        if let Some(end) = end {
+            assert!(start < end);
+        }
+
+        let command = Command::GetObjectRange { start, end };
+        let request = RequestImpl::new(self, path.as_ref(), command).await?;
+        request.response_data_to_stream().await
+    }
+
     /// Stream range of bytes from S3 path to a local file, generic over T: Write.
     ///
     /// # Example:
